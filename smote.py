@@ -365,7 +365,7 @@ if __name__ == "__main__":
         r'/dist_home/suryansh/dl/Skin-Lesion-Classification/Datasets/HAM10000/HAM10000_images_part_2'
     ]
     metadata_path = r'/dist_home/suryansh/dl/Skin-Lesion-Classification/Datasets/HAM10000/HAM10000_metadata.csv'
-    output_dir = r'/dist_home/suryansh/dl/Skin-Lesion-Classification/Datasets/HAM10000/smote_maximum_clarity'
+    output_dir = r'/smote_maximum_clarity'
 
     # 1. Preprocess dataset with maximum clarity preservation
     print("Preprocessing dataset with maximum clarity preservation...")
