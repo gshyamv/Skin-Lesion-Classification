@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from datetime import datetime
 from tqdm import tqdm
 import albumentations as A
-from albumentations.pytorch import ToTensorV2
+from albumentations.pytorch import ToTensorV2 
 import matplotlib.pyplot as plt
 import logging
 from sklearn.model_selection import train_test_split
@@ -893,7 +893,7 @@ def main():
             r"/dist_home/suryansh/dl/Skin-Lesion-Classification/Datasets/HAM10000/HAM10000_images_part_1",
             r"/dist_home/suryansh/dl/Skin-Lesion-Classification/Datasets/HAM10000/HAM10000_images_part_2"
         ]
-        mask_dir = r"/dist_home/suryansh/dl/Skin-Lesion-Classification/Datasets/HAM10000/HAM10000_segmentations_lesion_tschandl"
+        mask_dir = r"/dist_home/suryansh/dl/Skin-Lesion-Classification/Datasets/HAM10000_segmentations_lesion_tschandl"
         full_dataset = SkinLesionDataset(
             image_dirs=image_dirs,
             mask_dir=mask_dir,
