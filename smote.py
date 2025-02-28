@@ -314,7 +314,7 @@ def apply_texture_preservation(reconstructed_images, images_by_class):
 ###############################################################################
 def save_smote_images(reconstructed_images, original_images, idx_to_img_id, output_dir, original_df):
     """
-    Save both original and enhanced SMOTE-generated synthetic images to create
+    Save only enhanced SMOTE-generated synthetic images to create
     a balanced dataset. Also generates metadata CSV with comprehensive information.
     """
     os.makedirs(output_dir, exist_ok=True)
@@ -323,15 +323,11 @@ def save_smote_images(reconstructed_images, original_images, idx_to_img_id, outp
     
     new_metadata = []
 
-    print("Saving original images...")
-    for idx, img_id in tqdm(idx_to_img_id.items()):
+    # Skip saving original images as requested
+    print("Including original metadata but not saving original images...")
+    for idx, img_id in idx_to_img_id.items():
         if img_id in original_images:
-            img = original_images[img_id]
-            cv2.imwrite(
-                os.path.join(image_dir, f"{img_id}.jpg"),
-                cv2.cvtColor(img, cv2.COLOR_RGB2BGR),
-                [cv2.IMWRITE_JPEG_QUALITY, 100]
-            )
+            # Only add metadata for original images, don't save the images
             row = original_df[original_df['image_id'] == img_id].iloc[0].to_dict()
             row['is_synthetic'] = 0  # Mark as original
             new_metadata.append(row)
@@ -339,6 +335,7 @@ def save_smote_images(reconstructed_images, original_images, idx_to_img_id, outp
     print("Saving SMOTE-generated images...")
     for img, label, smote_id in tqdm(reconstructed_images):
         img = np.clip(img, 0, 255).astype(np.uint8)
+        # Save the SMOTE-generated image
         cv2.imwrite(
             os.path.join(image_dir, f"{smote_id}.jpg"),
             cv2.cvtColor(img, cv2.COLOR_RGB2BGR),
@@ -365,6 +362,7 @@ def save_smote_images(reconstructed_images, original_images, idx_to_img_id, outp
         }
         new_metadata.append(img_metadata)
 
+    # Save the metadata CSV file
     new_df = pd.DataFrame(new_metadata)
     new_df.to_csv(os.path.join(output_dir, 'balanced_metadata.csv'), index=False)
 
