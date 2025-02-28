@@ -263,7 +263,7 @@ class UnifiedJNet(nn.Module):
         # Segmentation branch
         self.seg_encoder = create_encoder(base_channels)
         self.attention = SelfAttention(in_dim=base_channels*8)
-        # Replace single bilinear upsampling with a multi-stage decoder for sharper masks
+        # Multi-stage decoder for sharper masks
         self.seg_decoder = nn.Sequential(
             nn.ConvTranspose2d(base_channels*8, base_channels*4, kernel_size=2, stride=2),
             nn.ReLU(inplace=True),
@@ -288,17 +288,11 @@ class UnifiedJNet(nn.Module):
         # Segmentation branch
         seg_features = self.seg_encoder(x)
         seg_features, attn_map = self.attention(seg_features)
-        raw_seg_logits = self.seg_decoder(seg_features)  # Output size should be 224x224 now
+        raw_seg_logits = self.seg_decoder(seg_features)  # Output size ~ (B,1,224,224)
         seg_prob = torch.sigmoid(raw_seg_logits)
 
-        # Create overlay.
-        # Option 1 (soft overlay): use seg_prob directly (differentiable)
+        # Create overlay (soft overlay)
         overlay = x * (1 - seg_prob) + self.white * seg_prob
-
-        # Option 2 (hard overlay): uncomment the following two lines to use a binary mask.
-        # Note: This detaches gradients from the segmentation branch.
-        # hard_mask = (seg_prob > 0.5).float()
-        # overlay = x * (1 - hard_mask) + self.white * hard_mask
 
         # Classification branch
         orig_features = self.cls_encoder(x)
@@ -404,17 +398,6 @@ def save_overlay_comparison(
       3) Predicted mask
       4) Overlay (predicted) on the original image
     Also show GT class and predicted class in the title.
-
-    Args:
-        image_tensor: (C,H,W) tensor
-        mask_tensor: (H,W) ground truth
-        pred_mask_tensor: (H,W) predicted
-        gt_label: int
-        pred_label: int
-        class_names: dict {class_index: class_str}
-        image_id: str
-        epoch: int
-        output_folder: where to save the result
     """
     os.makedirs(output_folder, exist_ok=True)
 
@@ -431,9 +414,9 @@ def save_overlay_comparison(
 
     # Create overlay
     overlay_np = image_np.copy()
-    # Where predicted mask > 0.5, we highlight
+    # Where predicted mask > 0.5, highlight
     overlay_mask = (pred_mask_np > 0.5)
-    # You can color the overlay region in red, for example:
+    # Color the overlay region in red, for example:
     overlay_np[overlay_mask, 0] = 1.0  # Red channel
     overlay_np[overlay_mask, 1] = 0.0
     overlay_np[overlay_mask, 2] = 0.0
@@ -458,7 +441,7 @@ def save_overlay_comparison(
 
     # Super-title with classification
     fig.suptitle(
-        f"Epoch {epoch} | GT Class: {class_names[gt_label]} | Pred Class: {class_names[pred_label]}",
+        f"Epoch {epoch} | GT: {class_names[gt_label]} | Pred: {class_names[pred_label]}",
         fontsize=14, y=1.08
     )
 
@@ -468,7 +451,7 @@ def save_overlay_comparison(
     plt.close()
 
 # -------------------------------------------------------------------------
-# Training Function
+# Training Function (No Early Stopping)
 # -------------------------------------------------------------------------
 def train_model(
     train_loader, 
@@ -482,20 +465,17 @@ def train_model(
 ):
     """
     Train the UnifiedJNet model for both segmentation and classification.
-    Save outputs (checkpoints, visualizations, overlays) in an organized manner.
+    This version does NOT early stop; it always runs 'num_epochs'.
     """
     # Create main result directory with timestamp
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     result_dir = os.path.join(output_dir, timestamp)
 
-    # Create subdirectories for different outputs
+    # Create subdirectories
     checkpoint_dir = os.path.join(result_dir, "checkpoints")
-    segmentation_dir = os.path.join(result_dir, "segmentation")
-    overlay_dir = os.path.join(result_dir, "overlay_images")  # as per user request
+    overlay_dir = os.path.join(result_dir, "overlay_images")
     visualization_dir = os.path.join(result_dir, "visualizations")
-
-    # Create all directories
-    for directory in [checkpoint_dir, segmentation_dir, overlay_dir, visualization_dir]:
+    for directory in [checkpoint_dir, overlay_dir, visualization_dir]:
         os.makedirs(directory, exist_ok=True)
 
     print(f"\nAll outputs will be saved in: {result_dir}")
@@ -513,8 +493,6 @@ def train_model(
     scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=1e-6)
 
     best_val_loss = float('inf')
-    patience = 7
-    patience_counter = 0
 
     history = {
         'train_total_loss': [], 'train_seg_loss': [], 'train_cls_loss': [], 'train_acc': [],
@@ -528,8 +506,7 @@ def train_model(
     print(f"Optimizer: AdamW (lr={optimizer.param_groups[0]['lr']})")
     print(f"Scheduler: CosineAnnealingLR, Epochs: {num_epochs}")
     print(f"Device: {device}")
-    print(f"Early Stopping Patience: {patience}")
-    print(f"Checkpoint Saving: Every 10 epochs")
+    print("No Early Stopping (will run full epochs).")
     print("=" * 80)
 
     model.to(device)
@@ -589,6 +566,7 @@ def train_model(
                 val_metrics.update(loss, seg_loss, cls_loss, cls_logits, labels)
 
                 preds = cls_logits.argmax(dim=1)
+                # Save overlay images for each sample in the validation batch
                 for i in range(images.size(0)):
                     pred_mask = seg_logits[i, 0]  # shape: (224,224)
                     save_overlay_comparison(
@@ -625,7 +603,7 @@ def train_model(
               f"(Seg: {val_metrics.avg_seg_loss:.4f}, Cls: {val_metrics.avg_cls_loss:.4f}), "
               f"Val Acc={val_metrics.accuracy:.2f}%, LR={current_lr:.2e}")
 
-        # Save best model checkpoint
+        # Save "best model" checkpoint if it improves on val loss
         if val_metrics.avg_loss < best_val_loss:
             best_val_loss = val_metrics.avg_loss
             checkpoint = {
@@ -639,14 +617,8 @@ def train_model(
             }
             torch.save(checkpoint, os.path.join(checkpoint_dir, 'best_model.pth'))
             print(f"  --> New best model saved at epoch {epoch+1} (Val Loss: {val_metrics.avg_loss:.4f})")
-            patience_counter = 0
-        else:
-            patience_counter += 1
-            if patience_counter >= patience:
-                print("Early stopping triggered!")
-                break
 
-        # Save checkpoint every 10 epochs
+        # Save checkpoint every 10 epochs or at last epoch
         if (epoch + 1) % 10 == 0 or (epoch + 1) == num_epochs:
             checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch+1}.pth')
             torch.save({
@@ -789,6 +761,7 @@ def evaluate_model(model, test_loader, device='cuda', visualization_dir=None):
         plt.savefig(cm_path, dpi=150)
         plt.close()
         print(f"Confusion matrix saved to: {cm_path}")
+
     return {
         'avg_seg_loss': avg_seg_loss,
         'avg_cls_loss': avg_cls_loss,
@@ -796,6 +769,9 @@ def evaluate_model(model, test_loader, device='cuda', visualization_dir=None):
         'accuracy': accuracy
     }
 
+# -------------------------------------------------------------------------
+# Utility to save binary segmentations for entire dataset
+# -------------------------------------------------------------------------
 def save_binary_segmentations(model, dataset, output_dir, device='cuda'):
     """
     Process all images in 'dataset' with 'model' and save binary segmentation masks.
@@ -814,6 +790,9 @@ def save_binary_segmentations(model, dataset, output_dir, device='cuda'):
         cv2.imwrite(output_path, seg_mask)
     print("Binary segmentation masks saved.")
 
+# -------------------------------------------------------------------------
+# Utility to save color overlay segmentation for entire dataset
+# -------------------------------------------------------------------------
 def save_color_overlay_segmentation(model, dataset, output_dir, device='cuda'):
     """
     Process all images in 'dataset' with 'model' and save color overlay images.
@@ -835,13 +814,15 @@ def save_color_overlay_segmentation(model, dataset, output_dir, device='cuda'):
         cv2.imwrite(output_path, cv2.cvtColor(overlay_np, cv2.COLOR_RGB2BGR))
     print("Color overlay images saved.")
 
+# -------------------------------------------------------------------------
+# Utility to visualize segmentation results on random samples
+# -------------------------------------------------------------------------
 def visualize_segmentation_results(model, dataset, device='cuda', num_examples=5, save_folder='visualisation'):
     """
     Randomly select a few images from 'dataset' and save plots of:
       - The original image
       - Ground truth mask
       - Predicted segmentation mask
-    The plots are saved in the specified folder instead of being displayed.
     """
     model.eval()
     if not os.path.exists(save_folder):
@@ -877,6 +858,9 @@ def visualize_segmentation_results(model, dataset, device='cuda', num_examples=5
         plt.savefig(save_path)
         plt.close()
 
+# -------------------------------------------------------------------------
+# Example Main (Optional)
+# -------------------------------------------------------------------------
 def main():
     try:
         torch.manual_seed(42)
@@ -885,22 +869,19 @@ def main():
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         logger.info(f"Using device: {device}")
 
-        metadata_path = r"/dist_home/suryansh/dl/Skin-Lesion-Classification/Datasets/HAM10000/HAM10000_metadata.csv"
+        # Example paths (Change to your own)
+        metadata_path = r"/path/to/HAM10000_metadata.csv"
+        image_dirs = [
+            r"/path/to/HAM10000_images_part_1",
+            r"/path/to/HAM10000_images_part_2"
+        ]
+        mask_dir = r"/path/to/HAM10000_segmentations_lesion_tschandl"
+
+        # Load metadata
         metadata_df = pd.read_csv(metadata_path)
         logger.info(f"Loaded dataset with {len(metadata_df)} images")
 
-        image_dirs = [
-            r"/dist_home/suryansh/dl/Skin-Lesion-Classification/Datasets/HAM10000/HAM10000_images_part_1",
-            r"/dist_home/suryansh/dl/Skin-Lesion-Classification/Datasets/HAM10000/HAM10000_images_part_2"
-        ]
-        mask_dir = r"/dist_home/suryansh/dl/Skin-Lesion-Classification/Datasets/HAM10000_segmentations_lesion_tschandl"
-        full_dataset = SkinLesionDataset(
-            image_dirs=image_dirs,
-            mask_dir=mask_dir,
-            metadata_df=metadata_df,
-            phase='val'
-        )
-
+        # Train/Val/Test split
         train_df, temp_df = train_test_split(
             metadata_df,
             test_size=0.3,
@@ -917,6 +898,7 @@ def main():
         logger.info(f"Validation set: {len(val_df)} images")
         logger.info(f"Test set: {len(test_df)} images")
 
+        # Create Datasets
         train_dataset = SkinLesionDataset(
             image_dirs=image_dirs,
             mask_dir=mask_dir,
@@ -936,6 +918,7 @@ def main():
             phase='val'
         )
 
+        # Create DataLoaders
         num_workers = 2
         train_loader = DataLoader(
             train_dataset,
@@ -959,16 +942,19 @@ def main():
             pin_memory=True
         )
 
+        # Initialize Model
         model = UnifiedJNet(num_classes=7).to(device)
 
+        # Train Model (no early stopping)
         model, history, result_dir = train_model(
             train_loader=train_loader,
             val_loader=val_loader,
             model=model,
-            num_epochs=100,
+            num_epochs=100,  # Will run full 100 epochs now
             device=device
         )
 
+        # Evaluate
         logger.info("Starting final model evaluation...")
         test_metrics = evaluate_model(
             model=model,
@@ -976,17 +962,17 @@ def main():
             device=device
         )
 
-        binary_seg_output_dir = os.path.join("segmented_images", datetime.now().strftime('%Y%m%d_%H%M%S'))
-        os.makedirs(binary_seg_output_dir, exist_ok=True)
-        save_binary_segmentations(model, full_dataset, binary_seg_output_dir, device=device)
-        logger.info(f"Binary segmentation masks saved in: {binary_seg_output_dir}")
+        # Optional: save segmentations on the entire dataset
+        # (for demonstration, let's do it on test_dataset only)
+        seg_output_dir = os.path.join("segmented_images", datetime.now().strftime('%Y%m%d_%H%M%S'))
+        os.makedirs(seg_output_dir, exist_ok=True)
+        save_binary_segmentations(model, test_dataset, seg_output_dir, device=device)
 
         overlay_output_dir = os.path.join("overlay_images", datetime.now().strftime('%Y%m%d_%H%M%S'))
         os.makedirs(overlay_output_dir, exist_ok=True)
-        save_color_overlay_segmentation(model, full_dataset, overlay_output_dir, device=device)
-        logger.info(f"Color overlay images saved in: {overlay_output_dir}")
+        save_color_overlay_segmentation(model, test_dataset, overlay_output_dir, device=device)
 
-        visualize_segmentation_results(model, full_dataset, device=device)
+        visualize_segmentation_results(model, test_dataset, device=device)
 
         logger.info("\nFinal Results Summary:")
         logger.info("=" * 80)
