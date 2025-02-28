@@ -160,8 +160,8 @@ def apply_tabular_smote(X, y, pca_variance=0.95, min_k_neighbors=3):
         n_components = int(pca_variance)
         print(f"Using n_components={n_components}")
 
-    # Use IncrementalPCA for memory efficiency
-    batch_size = 256
+    # Ensure batch_size is at least n_components for IncrementalPCA
+    batch_size = max(256, n_components)
     ipca = IncrementalPCA(n_components=n_components, batch_size=batch_size)
     
     # Fit IncrementalPCA in batches
