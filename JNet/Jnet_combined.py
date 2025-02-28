@@ -33,18 +33,18 @@ class SkinLesionDataset(Dataset):
     Dataset class for skin lesion segmentation and classification.
     Expects:
       - A metadata CSV with at least 'image_id' and 'dx' columns.
-      - Images are searched for in a list of directories.
-      - Segmentation masks are in a given folder. If a mask file is not found, a dummy mask (all ones) is used.
+      - A single 'image_dir' containing subfolders for each class (akiec, bcc, bkl, etc.).
+      - Segmentation masks in a separate folder. If a mask file is not found, a dummy mask (all ones) is used.
     """
-    def __init__(self, image_dirs, mask_dir, metadata_df, phase='train'):
+    def __init__(self, image_dir, mask_dir, metadata_df, phase='train'):
         """
         Args:
-            image_dirs (list): List of directories containing images.
+            image_dir (str): Path to the main combined dataset folder. Inside it are subfolders named by each class.
             mask_dir (str): Directory with segmentation masks.
             metadata_df (pd.DataFrame): DataFrame with at least 'image_id' and 'dx' columns.
             phase (str): 'train' or 'val'/'test' (affects augmentation).
         """
-        self.image_dirs = image_dirs
+        self.image_dir = image_dir
         self.mask_dir = mask_dir
         self.metadata_df = metadata_df
         self.phase = phase
@@ -100,17 +100,21 @@ class SkinLesionDataset(Dataset):
                 ToTensorV2()
             ], additional_targets={'mask': 'mask'})
 
-    def find_image_file(self, image_id):
-        """Search for the image file in the provided directories."""
-        for dir_path in self.image_dirs:
-            image_path = os.path.join(dir_path, f"{image_id}.jpg")
-            if os.path.exists(image_path):
-                return image_path
-        logger.error(f"Image file {image_id}.jpg not found in any of the specified directories.")
-        raise FileNotFoundError(f"Image file {image_id}.jpg not found in any of the specified directories.")
+    def find_image_file(self, image_id, class_name):
+        """
+        Search for the image file in the combined dataset folder,
+        where each subfolder is named after the lesion class (dx).
+        E.g., /combined-dataset/akiec/ISIC_0000000.jpg
+        """
+        image_path = os.path.join(self.image_dir, class_name, f"{image_id}.jpg")
+        if os.path.exists(image_path):
+            return image_path
+
+        logger.error(f"Image file {image_id}.jpg not found under class folder {class_name}.")
+        raise FileNotFoundError(f"Image file {image_id}.jpg not found under class folder {class_name}.")
 
     def find_mask_file(self, image_id):
-        """Search for a mask file using common naming patterns."""
+        """Search for a mask file using common naming patterns in mask_dir."""
         mask_patterns = [
             f"{image_id}_segmentation.png",
             f"{image_id}_segmented.png",
@@ -129,17 +133,18 @@ class SkinLesionDataset(Dataset):
     def __getitem__(self, idx):
         row = self.metadata_df.iloc[idx]
         image_id = row['image_id']
-        label = self.class_map[row['dx']]
+        dx = row['dx']  # e.g. "akiec", "bcc", ...
+        label = self.class_map[dx]
 
-        # Load image from one of the directories
-        image_path = self.find_image_file(image_id)
+        # Load image from the combined dataset folder
+        image_path = self.find_image_file(image_id, dx)
         image = cv2.imread(image_path)
         if image is None:
             logger.error(f"Failed to load image: {image_path}")
             raise ValueError(f"Failed to load image: {image_path}")
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        # Resize the image to the target size first
+        # Resize the image to 224x224 before augmentations
         image = cv2.resize(image, (224, 224))
 
         # Load mask (or use a dummy mask if not found)
@@ -288,7 +293,7 @@ class UnifiedJNet(nn.Module):
         # Segmentation branch
         seg_features = self.seg_encoder(x)
         seg_features, attn_map = self.attention(seg_features)
-        raw_seg_logits = self.seg_decoder(seg_features)  # Output size ~ (B,1,224,224)
+        raw_seg_logits = self.seg_decoder(seg_features)  # (B,1,224,224)
         seg_prob = torch.sigmoid(raw_seg_logits)
 
         # Create overlay (soft overlay)
@@ -406,7 +411,7 @@ def save_overlay_comparison(
     mask_np = mask_tensor.cpu().numpy()
     pred_mask_np = pred_mask_tensor.cpu().numpy()
 
-    # Denormalize if needed (because we used ImageNet means/std)
+    # Denormalize if needed
     mean = np.array([0.485, 0.456, 0.406])
     std  = np.array([0.229, 0.224, 0.225])
     image_np = std * image_np + mean
@@ -414,10 +419,9 @@ def save_overlay_comparison(
 
     # Create overlay
     overlay_np = image_np.copy()
-    # Where predicted mask > 0.5, highlight
+    # Where predicted mask > 0.5, highlight in red
     overlay_mask = (pred_mask_np > 0.5)
-    # Color the overlay region in red, for example:
-    overlay_np[overlay_mask, 0] = 1.0  # Red channel
+    overlay_np[overlay_mask, 0] = 1.0  # R
     overlay_np[overlay_mask, 1] = 0.0
     overlay_np[overlay_mask, 2] = 0.0
 
@@ -439,7 +443,6 @@ def save_overlay_comparison(
     axs[3].set_title("Overlay (Predicted)")
     axs[3].axis('off')
 
-    # Super-title with classification
     fig.suptitle(
         f"Epoch {epoch} | GT: {class_names[gt_label]} | Pred: {class_names[pred_label]}",
         fontsize=14, y=1.08
@@ -568,7 +571,7 @@ def train_model(
                 preds = cls_logits.argmax(dim=1)
                 # Save overlay images for each sample in the validation batch
                 for i in range(images.size(0)):
-                    pred_mask = seg_logits[i, 0]  # shape: (224,224)
+                    pred_mask = seg_logits[i, 0]
                     save_overlay_comparison(
                         image_tensor=images[i],
                         mask_tensor=masks[i],
@@ -859,7 +862,7 @@ def visualize_segmentation_results(model, dataset, device='cuda', num_examples=5
         plt.close()
 
 # -------------------------------------------------------------------------
-# Example Main (Optional)
+# Example Main (Optional Usage)
 # -------------------------------------------------------------------------
 def main():
     try:
@@ -868,16 +871,11 @@ def main():
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         logger.info(f"Using device: {device}")
-
-        # Example paths (Change to your own)
-        metadata_path = r"/path/to/HAM10000_metadata.csv"
-        image_dirs = [
-            r"/path/to/HAM10000_images_part_1",
-            r"/path/to/HAM10000_images_part_2"
-        ]
-        mask_dir = r"/path/to/HAM10000_segmentations_lesion_tschandl"
-
-        # Load metadata
+        # 1) CSV that has columns: [image_id, dx]
+        metadata_path = r"/path/to/your_metadata.csv"
+        image_dir = r"/path/to/combined-dataset"
+        mask_dir = r"/path/to/mask_folder"
+        output_dir = "results"
         metadata_df = pd.read_csv(metadata_path)
         logger.info(f"Loaded dataset with {len(metadata_df)} images")
 
@@ -900,26 +898,26 @@ def main():
 
         # Create Datasets
         train_dataset = SkinLesionDataset(
-            image_dirs=image_dirs,
+            image_dir=image_dir,
             mask_dir=mask_dir,
             metadata_df=train_df,
             phase='train'
         )
         val_dataset = SkinLesionDataset(
-            image_dirs=image_dirs,
+            image_dir=image_dir,
             mask_dir=mask_dir,
             metadata_df=val_df,
             phase='val'
         )
         test_dataset = SkinLesionDataset(
-            image_dirs=image_dirs,
+            image_dir=image_dir,
             mask_dir=mask_dir,
             metadata_df=test_df,
             phase='val'
         )
 
         # Create DataLoaders
-        num_workers = 2
+        num_workers = 4
         train_loader = DataLoader(
             train_dataset,
             batch_size=32,
@@ -950,8 +948,9 @@ def main():
             train_loader=train_loader,
             val_loader=val_loader,
             model=model,
-            num_epochs=100,  # Will run full 100 epochs now
-            device=device
+            num_epochs=100,  
+            device=device,
+            output_dir=output_dir
         )
 
         # Evaluate
@@ -959,20 +958,18 @@ def main():
         test_metrics = evaluate_model(
             model=model,
             test_loader=test_loader,
-            device=device
+            device=device,
+            visualization_dir=result_dir  
         )
 
-        # Optional: save segmentations on the entire dataset
-        # (for demonstration, let's do it on test_dataset only)
-        seg_output_dir = os.path.join("segmented_images", datetime.now().strftime('%Y%m%d_%H%M%S'))
-        os.makedirs(seg_output_dir, exist_ok=True)
+        # Optional: save segmentations on the entire test_dataset
+        seg_output_dir = os.path.join(result_dir, "test_segmentations")
         save_binary_segmentations(model, test_dataset, seg_output_dir, device=device)
 
-        overlay_output_dir = os.path.join("overlay_images", datetime.now().strftime('%Y%m%d_%H%M%S'))
-        os.makedirs(overlay_output_dir, exist_ok=True)
+        overlay_output_dir = os.path.join(result_dir, "test_overlays")
         save_color_overlay_segmentation(model, test_dataset, overlay_output_dir, device=device)
 
-        visualize_segmentation_results(model, test_dataset, device=device)
+        visualize_segmentation_results(model, test_dataset, device=device, num_examples=5)
 
         logger.info("\nFinal Results Summary:")
         logger.info("=" * 80)
