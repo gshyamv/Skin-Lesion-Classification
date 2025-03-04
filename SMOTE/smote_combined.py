@@ -6,24 +6,23 @@ from tqdm import tqdm
 from collections import Counter
 import cv2
 from imblearn.over_sampling import SMOTE
-from sklearn.decomposition import PCA, IncrementalPCA
+from sklearn.decomposition import PCA
 import random
 import gc  # For garbage collection
-import shutil  # For copying files
 
 # 1. Data Loading and Preprocessing with Reduced Resolution for Memory Efficiency
 def preprocess_dataset(combined_dataset_path, sample_size=None, resize_dim=256):
     """
-    Load images from a folder structure where each subfolder is a class.
+    Load images from a folder structure where each subfolder is a class
     
     Parameters:
-    - combined_dataset_path: Path to the combined dataset folder containing class subfolders.
-    - sample_size: Optional limit on number of images to process per class (for testing).
-    - resize_dim: Size to resize images to before feature extraction.
+    combined_dataset_path: Path to the combined dataset folder containing class subfolders
+    sample_size: Optional limit on number of images to process per class (for testing)
+    resize_dim: Size to resize images to before feature extraction
     """
     # Get all class folders
     class_folders = [folder for folder in os.listdir(combined_dataset_path) 
-                     if os.path.isdir(os.path.join(combined_dataset_path, folder))]
+                    if os.path.isdir(os.path.join(combined_dataset_path, folder))]
     
     print(f"Found {len(class_folders)} class folders: {class_folders}")
     
@@ -37,7 +36,7 @@ def preprocess_dataset(combined_dataset_path, sample_size=None, resize_dim=256):
     for class_name in class_folders:
         class_path = os.path.join(combined_dataset_path, class_name)
         image_files = [f for f in os.listdir(class_path) 
-                       if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+                      if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
         
         print(f"Found {len(image_files)} images in class {class_name}")
         
@@ -67,7 +66,7 @@ def preprocess_dataset(combined_dataset_path, sample_size=None, resize_dim=256):
                 image_original_sizes[img_id] = img.shape
                 
                 # Use a smaller resolution for SMOTE processing
-                img_resized = cv2.resize(img, (resize_dim, resize_dim), interpolation=cv2.INTER_LANCZOS4)
+                img_resized = cv2.resize(img, (resize_dim, resize_dim))
                 
                 # Apply simple preprocessing
                 enhanced = cv2.convertScaleAbs(img_resized, alpha=1.1, beta=10)
@@ -83,7 +82,7 @@ def preprocess_dataset(combined_dataset_path, sample_size=None, resize_dim=256):
                 })
                 
                 # Only store thumbnail to save memory
-                thumb = cv2.resize(img, (resize_dim, resize_dim), interpolation=cv2.INTER_LANCZOS4)
+                thumb = cv2.resize(img, (resize_dim, resize_dim))
                 images[img_id] = thumb
                 
             except Exception as e:
@@ -128,53 +127,19 @@ def preprocess_dataset(combined_dataset_path, sample_size=None, resize_dim=256):
 
     return X, y, idx_to_img_id, images, metadata_df, class_distribution, class_sizes, original_paths
 
-# 2. Apply SMOTE with memory-efficient parameters using IncrementalPCA
+# 2. Apply SMOTE with memory-efficient parameters
 def apply_tabular_smote(X, y, pca_variance=0.99, min_k_neighbors=3):
     """
-    Apply SMOTE to the image data with memory-efficient parameters.
-    
-    Parameters:
-    - X: Original feature array.
-    - y: Labels.
-    - pca_variance: If between 0 and 1, the fraction of variance to preserve.
-    - min_k_neighbors: Minimum k_neighbors for SMOTE.
-    
-    Returns:
-    - X_res: Resampled features transformed back to the original space.
-    - y_res: Resampled labels.
-    - new_class_distribution: New distribution of classes after SMOTE.
+    Apply SMOTE to the image data with memory-efficient parameters
     """
     print("Applying SMOTE with memory-efficient parameters...")
-    
-    # Determine the number of PCA components needed using a random subset if pca_variance < 1
-    if 0 < pca_variance < 1:
-        sample_size = min(1000, X.shape[0])
-        sample_indices = np.random.choice(X.shape[0], sample_size, replace=False)
-        X_sample = X[sample_indices]
-        temp_pca = PCA(svd_solver='randomized')
-        temp_pca.fit(X_sample)
-        cum_explained = np.cumsum(temp_pca.explained_variance_ratio_)
-        n_components = np.searchsorted(cum_explained, pca_variance) + 1
-        print(f"Determined n_components={n_components} to preserve {pca_variance*100:.1f}% variance")
-    else:
-        n_components = int(pca_variance)
-        print(f"Using n_components={n_components}")
 
-    # Ensure batch_size is at least n_components for IncrementalPCA
-    batch_size = max(256, n_components)
-    ipca = IncrementalPCA(n_components=n_components, batch_size=batch_size)
-    
-    # Fit IncrementalPCA in batches
-    for batch_start in range(0, X.shape[0], batch_size):
-        batch_end = min(batch_start + batch_size, X.shape[0])
-        ipca.partial_fit(X[batch_start:batch_end])
-    
-    # Transform X in batches
-    X_reduced_batches = []
-    for batch_start in range(0, X.shape[0], batch_size):
-        batch_end = min(batch_start + batch_size, X.shape[0])
-        X_reduced_batches.append(ipca.transform(X[batch_start:batch_end]))
-    X_reduced = np.vstack(X_reduced_batches)
+    # More aggressive dimension reduction to save memory
+    print(f"Using PCA for dimensionality reduction preserving {pca_variance*100}% variance...")
+
+    # Find number of components needed to preserve desired variance
+    pca = PCA(n_components=pca_variance)
+    X_reduced = pca.fit_transform(X)
     print(f"Reduced dimensions from {X.shape[1]} to {X_reduced.shape[1]}")
 
     # Check for minimum samples in minority class
@@ -190,6 +155,7 @@ def apply_tabular_smote(X, y, pca_variance=0.99, min_k_neighbors=3):
     print(f"Using k_neighbors={k_neighbors} for SMOTE")
     
     try:
+        # Apply SMOTE with adjusted parameters
         smote = SMOTE(random_state=42, k_neighbors=k_neighbors)
         X_res_reduced, y_res = smote.fit_resample(X_reduced, y)
     except ValueError as e:
@@ -198,43 +164,30 @@ def apply_tabular_smote(X, y, pca_variance=0.99, min_k_neighbors=3):
         smote = SMOTE(random_state=42, k_neighbors=1)
         X_res_reduced, y_res = smote.fit_resample(X_reduced, y)
 
-    # Transform back to original space in batches
-    X_res_batches = []
-    for batch_start in range(0, X_res_reduced.shape[0], batch_size):
-        batch_end = min(batch_start + batch_size, X_res_reduced.shape[0])
-        X_res_batches.append(ipca.inverse_transform(X_res_reduced[batch_start:batch_end]))
-    X_res = np.vstack(X_res_batches)
-    
-    # Properly normalize values to ensure valid pixel ranges
-    X_res = np.clip(X_res, 0, 255).astype(np.uint8)
+    # Transform back to original space
+    X_res = pca.inverse_transform(X_res_reduced)
 
+    # Apply clipping to ensure valid pixel values
+    X_res = np.clip(X_res, 0, 255)
+
+    # Check new class distribution
     new_class_distribution = Counter(y_res)
     print("Class distribution after SMOTE:")
     for class_name, count in new_class_distribution.items():
         print(f"{class_name}: {count}")
-    
+
     return X_res, y_res, new_class_distribution
 
-# 3. Reconstruct images with improved enhancement to fix blurring
+# 3. Reconstruct images with simplified enhancement
 def reconstruct_images(X_res, y_res, class_sizes, original_count, resize_dim=256):
     """
-    Reconstruct images from SMOTE-generated tabular data with improved enhancements.
-    
-    Parameters:
-    - X_res: Resampled feature array.
-    - y_res: Resampled labels.
-    - class_sizes: Dictionary mapping class labels to lists of original image sizes.
-    - original_count: Number of original images.
-    - resize_dim: Resolution used during preprocessing.
-    
-    Returns:
-    - reconstructed_images: List of tuples (image, label, image_id).
+    Reconstruct images from SMOTE-generated tabular data with simpler enhancements
     """
+    # Size used during preprocessing
     recon_base_size = (resize_dim, resize_dim, 3)
+
     reconstructed_images = []
     synthetic_count = 0
-    
-    print("Reconstructing images with enhanced techniques to reduce blurring...")
     
     # Process in batches to save memory
     batch_size = 100
@@ -245,7 +198,7 @@ def reconstruct_images(X_res, y_res, class_sizes, original_count, resize_dim=256
             features = X_res[i]
             label = y_res[i]
             
-            # Ensure proper data type and range
+            # Normalize values to valid pixel range
             features = np.clip(features, 0, 255).astype(np.uint8)
 
             # Reshape to intermediate dimensions
@@ -253,44 +206,24 @@ def reconstruct_images(X_res, y_res, class_sizes, original_count, resize_dim=256
             
             synthetic_count += 1
 
-            # Apply enhanced techniques to improve sharpness and clarity
+            # Apply a simpler set of enhancements
             try:
-                # 1. Apply histogram equalization to improve contrast
-                img_yuv = cv2.cvtColor(img, cv2.COLOR_RGB2YUV)
-                img_yuv[:,:,0] = cv2.equalizeHist(img_yuv[:,:,0])
-                img = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2RGB)
+                # 1. Basic color correction
+                img = cv2.convertScaleAbs(img, alpha=1.1, beta=10)
                 
-                # 2. Apply unsharp masking for enhanced sharpness
-                blurred = cv2.GaussianBlur(img, (0, 0), 3)
-                img = cv2.addWeighted(img, 1.5, blurred, -0.5, 0)
-                
-                # 3. Apply stronger sharpening kernel
-                kernel = np.array([[-1, -1, -1],
-                                  [-1, 9, -1],
-                                  [-1, -1, -1]])
+                # 2. Mild sharpening
+                kernel = np.array([[-0.5,-0.5,-0.5], [-0.5,5,-0.5], [-0.5,-0.5,-0.5]])
                 img = cv2.filter2D(img, -1, kernel)
-                
-                # 4. Adjust contrast and brightness
-                img = cv2.convertScaleAbs(img, alpha=1.2, beta=5)
-                
-                # 5. Apply slight noise reduction to smooth artifacts (but preserve edges)
-                img = cv2.fastNlMeansDenoisingColored(img, None, 5, 5, 7, 15)
                 
                 # Choose size from same class if available (default to current size)
                 final_img = img
                 if label in class_sizes and class_sizes[label]:
                     target_size = random.choice(class_sizes[label])
-                    # Resize to match original class dimensions with high-quality interpolation
+                    # Resize to match original class dimensions, with safe error handling
                     try:
-                        # Use Lanczos interpolation for higher quality resizing
-                        final_img = cv2.resize(img, (target_size[1], target_size[0]), 
-                                              interpolation=cv2.INTER_LANCZOS4)
+                        final_img = cv2.resize(img, (target_size[1], target_size[0]))
                     except Exception as e:
                         print(f"Resize error: {str(e)}. Using original size.")
-                        
-                # Ensure final values are within valid range
-                final_img = np.clip(final_img, 0, 255).astype(np.uint8)
-                
             except Exception as e:
                 print(f"Image enhancement error: {str(e)}. Using basic reconstruction.")
                 final_img = img
@@ -306,18 +239,7 @@ def reconstruct_images(X_res, y_res, class_sizes, original_count, resize_dim=256
 # 4. Save reconstructed SMOTE images with efficient batch processing
 def save_smote_images(reconstructed_images, original_images, idx_to_img_id, output_dir, original_df, original_paths):
     """
-    Save both original and SMOTE-generated images with batch processing.
-    
-    Parameters:
-    - reconstructed_images: List of synthetic images.
-    - original_images: Dictionary of original thumbnail images.
-    - idx_to_img_id: Mapping from index to image_id.
-    - output_dir: Directory to save balanced images.
-    - original_df: DataFrame containing original metadata.
-    - original_paths: Mapping from image_id to original file path.
-    
-    Returns:
-    - final class distributions.
+    Save both original and SMOTE-generated images with batch processing
     """
     # Create main output directory
     os.makedirs(output_dir, exist_ok=True)
@@ -342,6 +264,8 @@ def save_smote_images(reconstructed_images, original_images, idx_to_img_id, outp
             dst_path = os.path.join(output_dir, class_name, filename)
             
             try:
+                # Copy the original file
+                import shutil
                 shutil.copy2(src_path, dst_path)
                 
                 # Add metadata
@@ -356,7 +280,7 @@ def save_smote_images(reconstructed_images, original_images, idx_to_img_id, outp
             except Exception as e:
                 print(f"Error copying original image {img_id}: {str(e)}")
 
-    # Then, save SMOTE-generated images in batches with improved quality settings
+    # Then, save SMOTE-generated images in batches
     print("Saving SMOTE-generated images...")
     batch_size = 50
     for batch_start in range(0, len(reconstructed_images), batch_size):
@@ -365,13 +289,15 @@ def save_smote_images(reconstructed_images, original_images, idx_to_img_id, outp
         
         for img, label, img_id in tqdm(batch, leave=False):
             try:
+                # Ensure colors are valid
                 img = np.clip(img, 0, 255).astype(np.uint8)
+
+                # Save with good quality to class subfolder
                 img_path = os.path.join(output_dir, label, f"{img_id}.jpg")
-                
-                # Use higher quality settings when saving JPEG images
                 cv2.imwrite(img_path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR),
-                            [cv2.IMWRITE_JPEG_QUALITY, 98, cv2.IMWRITE_JPEG_OPTIMIZE, 1])
-                
+                           [cv2.IMWRITE_JPEG_QUALITY, 99])
+
+                # Create metadata for synthetic image
                 img_metadata = {
                     'image_id': img_id,
                     'dx': label,
@@ -384,6 +310,7 @@ def save_smote_images(reconstructed_images, original_images, idx_to_img_id, outp
             except Exception as e:
                 print(f"Error saving synthetic image {img_id}: {str(e)}")
         
+        # Free memory after each batch
         gc.collect()
 
     # Save new metadata
@@ -391,6 +318,7 @@ def save_smote_images(reconstructed_images, original_images, idx_to_img_id, outp
         metadata_df = pd.DataFrame(new_metadata)
         metadata_df.to_csv(os.path.join(output_dir, 'smote_metadata.csv'), index=False)
         
+        # Generate summary
         class_distribution = Counter(metadata_df['dx'])
         synthetic_count = Counter(metadata_df[metadata_df['is_synthetic'] == 1]['dx'])
         original_count = Counter(metadata_df[metadata_df['is_synthetic'] == 0]['dx'])
@@ -408,11 +336,11 @@ def save_smote_images(reconstructed_images, original_images, idx_to_img_id, outp
 # Main execution
 if __name__ == "__main__":
     # Paths and configurations - MODIFY THESE TO MATCH YOUR ENVIRONMENT
-    combined_dataset_path = './combined-dataset'  # Path to the combined dataset folder
-    output_dir = './balanced_dataset'  # Output directory
+    combined_dataset_path = r'C:\Users\rdeva\Downloads\SEM3\SEM4\Deep_Learning\combined-dataset'  # Path to the combined dataset folder
+    output_dir = r'C:\Users\rdeva\Downloads\SEM3\SEM4\Deep_Learning\outs'  # Output directory
     
     # Parameters
-    SAMPLE_SIZE = None  # Set to a number for testing or None to use all images
+    SAMPLE_SIZE = 500  # Set to a number for testing or None to use all images
     RESIZE_DIM = 256   # Resolution for processing
     
     try:
@@ -425,14 +353,14 @@ if __name__ == "__main__":
         print("Applying SMOTE with memory-efficient parameters...")
         X_res, y_res, new_class_distribution = apply_tabular_smote(X, y, pca_variance=0.99)
 
-        # 3. Reconstruct images with improved enhancement to fix blurring
-        print("Reconstructing images with improved enhancement...")
-        original_count = len(original_images)   
+        # 3. Reconstruct images with simplified enhancement
+        print("Reconstructing images with simplified enhancement...")
+        original_count = len(original_images)
         reconstructed_images = reconstruct_images(X_res, y_res, class_sizes, original_count, resize_dim=RESIZE_DIM)
 
-        # 4. Save balanced dataset with higher quality settings
+        # 4. Save balanced dataset
         print("Saving balanced dataset...")
-        final_distribution, orig_count, synthetic_count = save_smote_images(
+        final_distribution, original_count, synthetic_count = save_smote_images(
             reconstructed_images, original_images, idx_to_img_id, output_dir, metadata_df, original_paths)
 
         # 5. Visualize results
@@ -449,7 +377,7 @@ if __name__ == "__main__":
         # Plot balanced distribution
         plt.subplot(2, 1, 2)
         df = pd.DataFrame({
-            'Original': pd.Series(orig_count),
+            'Original': pd.Series(original_count),
             'Synthetic': pd.Series(synthetic_count)
         })
         df.plot(kind='bar', stacked=True, figsize=(12, 6))
@@ -457,7 +385,8 @@ if __name__ == "__main__":
         plt.xticks(rotation=45)
         plt.tight_layout()
         
-        plt.savefig(os.path.join(output_dir, 'distribution.png'), dpi=300)
+        # Save plot
+        plt.savefig(os.path.join(output_dir, 'distribution.png'))
         plt.close()
 
         print(f"SMOTE balancing complete! Balanced dataset saved to {output_dir}")
