@@ -6,7 +6,7 @@ from tqdm import tqdm
 from collections import Counter
 import cv2
 from imblearn.over_sampling import SMOTE
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, IncrementalPCA
 import random
 import gc  # For garbage collection
 
@@ -127,19 +127,29 @@ def preprocess_dataset(combined_dataset_path, sample_size=None, resize_dim=256):
 
     return X, y, idx_to_img_id, images, metadata_df, class_distribution, class_sizes, original_paths
 
-# 2. Apply SMOTE with memory-efficient parameters
+# 2. Apply SMOTE with memory-efficient parameters using IncrementalPCA
 def apply_tabular_smote(X, y, pca_variance=0.99, min_k_neighbors=3):
     """
-    Apply SMOTE to the image data with memory-efficient parameters
+    Apply SMOTE to the image data with memory-efficient parameters.
+    This function uses a two-step PCA:
+      1. A preliminary PCA on a random subset to determine the number of components required to preserve the desired variance.
+      2. IncrementalPCA (which works in batches) on the full dataset.
     """
     print("Applying SMOTE with memory-efficient parameters...")
+    print(f"Using IncrementalPCA for dimensionality reduction preserving {pca_variance*100}% variance...")
 
-    # More aggressive dimension reduction to save memory
-    print(f"Using PCA for dimensionality reduction preserving {pca_variance*100}% variance...")
+    # Step 1: Determine number of components using a random subset
+    sample_size = min(1000, X.shape[0])
+    idx = np.random.choice(X.shape[0], sample_size, replace=False)
+    X_sample = X[idx]
+    temp_pca = PCA(n_components=pca_variance, svd_solver='full')
+    temp_pca.fit(X_sample)
+    n_components_needed = temp_pca.n_components_
+    print(f"Number of PCA components to preserve {pca_variance*100}% variance: {n_components_needed}")
 
-    # Find number of components needed to preserve desired variance
-    pca = PCA(n_components=pca_variance)
-    X_reduced = pca.fit_transform(X)
+    # Step 2: Use IncrementalPCA to process the full dataset in batches
+    ipca = IncrementalPCA(n_components=n_components_needed, batch_size=100)
+    X_reduced = ipca.fit_transform(X)
     print(f"Reduced dimensions from {X.shape[1]} to {X_reduced.shape[1]}")
 
     # Check for minimum samples in minority class
@@ -155,7 +165,7 @@ def apply_tabular_smote(X, y, pca_variance=0.99, min_k_neighbors=3):
     print(f"Using k_neighbors={k_neighbors} for SMOTE")
     
     try:
-        # Apply SMOTE with adjusted parameters
+        # Apply SMOTE with adjusted parameters on the reduced data
         smote = SMOTE(random_state=42, k_neighbors=k_neighbors)
         X_res_reduced, y_res = smote.fit_resample(X_reduced, y)
     except ValueError as e:
@@ -164,8 +174,8 @@ def apply_tabular_smote(X, y, pca_variance=0.99, min_k_neighbors=3):
         smote = SMOTE(random_state=42, k_neighbors=1)
         X_res_reduced, y_res = smote.fit_resample(X_reduced, y)
 
-    # Transform back to original space
-    X_res = pca.inverse_transform(X_res_reduced)
+    # Transform back to original space using IncrementalPCA's inverse_transform
+    X_res = ipca.inverse_transform(X_res_reduced)
 
     # Apply clipping to ensure valid pixel values
     X_res = np.clip(X_res, 0, 255)
@@ -181,7 +191,7 @@ def apply_tabular_smote(X, y, pca_variance=0.99, min_k_neighbors=3):
 # 3. Reconstruct images with simplified enhancement
 def reconstruct_images(X_res, y_res, class_sizes, original_count, resize_dim=256):
     """
-    Reconstruct images from SMOTE-generated tabular data with simpler enhancements
+    Reconstruct images from SMOTE-generated tabular data with simpler enhancements.
     """
     # Size used during preprocessing
     recon_base_size = (resize_dim, resize_dim, 3)
@@ -239,7 +249,7 @@ def reconstruct_images(X_res, y_res, class_sizes, original_count, resize_dim=256
 # 4. Save reconstructed SMOTE images with efficient batch processing
 def save_smote_images(reconstructed_images, original_images, idx_to_img_id, output_dir, original_df, original_paths):
     """
-    Save both original and SMOTE-generated images with batch processing
+    Save both original and SMOTE-generated images with batch processing.
     """
     # Create main output directory
     os.makedirs(output_dir, exist_ok=True)
