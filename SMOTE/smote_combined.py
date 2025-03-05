@@ -335,16 +335,14 @@ def save_smote_images(reconstructed_images, original_images, idx_to_img_id, outp
 
 # Main execution
 if __name__ == "__main__":
-    # Paths and configurations - MODIFY THESE TO MATCH YOUR ENVIRONMENT
     combined_dataset_path = r'C:\Users\rdeva\Downloads\SEM3\SEM4\Deep_Learning\combined-dataset'  # Path to the combined dataset folder
-    output_dir = r'C:\Users\rdeva\Downloads\SEM3\SEM4\Deep_Learning\outs'  # Output directory
+    output_dir = r'C:\Users\rdeva\Downloads\SEM3\SEM4\Deep_Learning\outs'  
     
     # Parameters
-    SAMPLE_SIZE = 500  # Set to a number for testing or None to use all images
-    RESIZE_DIM = 256   # Resolution for processing
+    SAMPLE_SIZE = 500 
+    RESIZE_DIM = 256  
     
     try:
-        # 1. Preprocess dataset with memory efficiency
         print(f"Preprocessing dataset from {combined_dataset_path}...")
         X, y, idx_to_img_id, original_images, metadata_df, original_distribution, class_sizes, original_paths = preprocess_dataset(
             combined_dataset_path, sample_size=SAMPLE_SIZE, resize_dim=RESIZE_DIM)
