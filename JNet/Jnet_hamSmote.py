@@ -112,7 +112,7 @@ class SkinLesionDataset(Dataset):
         """Search for a mask file using common naming patterns."""
         mask_patterns = [
             f"{image_id}_segmentation.png",
-            f"{image_id}_segmented.png",
+            f"{image_id}_mask_mask.jpg",
         ]
         for pattern in mask_patterns:
             mask_path = os.path.join(self.mask_dir, pattern)
@@ -172,7 +172,6 @@ class SelfAttention(nn.Module):
     def __init__(self, in_dim):
         super(SelfAttention, self).__init__()
         self.chanel_in = in_dim
-
         self.query_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
         self.key_conv   = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
         self.value_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
@@ -193,7 +192,6 @@ class SelfAttention(nn.Module):
         energy = torch.bmm(proj_query, proj_key)
         attention = self.softmax(energy)
         proj_value = self.value_conv(x).view(B, -1, width * height)
-
         out = torch.bmm(proj_value, attention.permute(0, 2, 1))
         out = out.view(B, C, width, height)
         out = self.gamma * out + x
@@ -243,7 +241,7 @@ def create_encoder(base_channels=64):
 class UnifiedJNet(nn.Module):
     """
     A unified model that performs both segmentation and classification in one pass.
-
+    
     Workflow:
       - A segmentation encoder extracts features from the original image.
       - A self-attention block is applied to the segmentation features.
@@ -268,11 +266,9 @@ class UnifiedJNet(nn.Module):
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(base_channels, 1, kernel_size=2, stride=2)
         )
-
         # Classification branch
         self.cls_encoder = create_encoder(base_channels)
         self.fc = nn.Linear(base_channels*8, num_classes)
-
         # Precompute "white" in normalized space for overlay
         white_vals = [(1 - m)/s for m, s in zip([0.485, 0.456, 0.406],
                                                [0.229, 0.224, 0.225])]
@@ -283,15 +279,12 @@ class UnifiedJNet(nn.Module):
         seg_features, attn_map = self.attention(seg_features)
         raw_seg_logits = self.seg_decoder(seg_features)
         seg_prob = torch.sigmoid(raw_seg_logits)
-
         overlay = x * (1 - seg_prob) + self.white * seg_prob
-
         orig_features = self.cls_encoder(x)
         overlay_features = self.cls_encoder(overlay)
         combined_features = (orig_features + overlay_features) / 2.0
         gap = combined_features.mean(dim=(2, 3))
         cls_logits = self.fc(gap)
-
         return raw_seg_logits, cls_logits, overlay
 
 # -------------------------------------------------------------------------
@@ -813,7 +806,7 @@ def main():
 
         # Change these paths to match your local setup:
         metadata_path = r"path to HAM10000_metadata"
-        image_dir = r"path to our smote balanced"  
+        image_dir = r"path to our smote balancedl"  
         mask_dir = r"path to Segmentation folder"
 
         # Load metadata
@@ -837,7 +830,7 @@ def main():
         logger.info(f"Validation set: {len(val_df)} images")
         logger.info(f"Test set: {len(test_df)} images")
 
-        # Create Datasets using the single image directory
+        # Create Datasets using the image directory
         train_dataset = SkinLesionDataset(
             image_dir=image_dir,
             mask_dir=mask_dir,
