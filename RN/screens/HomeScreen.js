@@ -171,8 +171,6 @@ const HomeScreen = () => {
 
     try {
       setIsLoading(true);
-
-      // Add a small delay to ensure camera is fully ready
       await new Promise(resolve => setTimeout(resolve, 300));
 
       const photo = await cameraRef.takePictureAsync({
@@ -313,7 +311,7 @@ const HomeScreen = () => {
     }
   };
 
-  // Image upload and analysis handler (updated to convert URI to Blob)
+  // Image upload and analysis handler (convert URI to Blob)
   const handleUpload = async () => {
     if (!selectedImage) {
       setErrorMessage('Please select an image first.');
@@ -325,7 +323,7 @@ const HomeScreen = () => {
       setIsLoading(true);
       setUploadProgress(0.1);
       
-      // Convert the image URI to a blob
+      // Converted the image URI to a blob
       const response = await fetch(selectedImage);
       const blob = await response.blob();
       

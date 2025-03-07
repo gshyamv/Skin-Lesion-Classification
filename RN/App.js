@@ -77,8 +77,6 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setIsAuthenticated(!!user);
       setIsLoading(false);
-      
-      // Store user data in AsyncStorage if logged in
       if (user) {
         try {
           await AsyncStorage.setItem('userData', JSON.stringify({

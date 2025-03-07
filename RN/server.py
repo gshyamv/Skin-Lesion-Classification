@@ -6,10 +6,10 @@ import os
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend communication
+CORS(app)  
 
 # MongoDB Connection
-MONGO_URI = "mongodb://localhost:27017/imagedb"  # Change this if using a cloud DB
+MONGO_URI = "mongodb://localhost:27017/imagedb" 
 client = MongoClient(MONGO_URI)
 db = client["imagedb"]
 images_collection = db["images"]
