@@ -30,4 +30,18 @@ from huggingface_hub import snapshot_download
 model_name = "Sharukesh/GAN-HAM10000-class-balancing"
 
 # Download the model locally
-snapshot_download(repo_id=model_name, local_dir="/content/attention-unet")
+snapshot_download(repo_id=model_name, local_dir="/content/GAN")
+```
+
+### SMOTE
+On our implementation of GAN the outputs were not well featurized, so those images could not be used in the training of the model, hence we choose to do SMOTE (Synthetic Minority Oversampling Technique).
+
+#### How SMOTE Works:
+
+1. **Identify Minority Class:** It targets the minority class in an imbalanced dataset.
+2. **Select a Sample:** Randomly picks a sample from the minority class.
+3. **Find Nearest Neighbors:** Identifies its k-nearest neighbors in the feature space (typically using Euclidean distance).
+4. **Generate Synthetic Samples:** Creates new synthetic data points by interpolating between the original sample and one of its nearest neighbors.
+5. **Repeat:** This process is repeated until the desired class balance is achieved.
+
+Find our implementation of smote down [here](https://github.com/gshyamv/Skin-Lesion-Classification/tree/main/SMOTE)
