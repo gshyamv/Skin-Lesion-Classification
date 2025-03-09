@@ -11,7 +11,7 @@ const MainScreen = () => {
   const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundCo1lor: theme.colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.dark ? 'light-content' : 'dark-content'} />
       
       <Appbar.Header style={styles.header} mode="center-aligned">
