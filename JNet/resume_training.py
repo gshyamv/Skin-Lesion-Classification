@@ -386,7 +386,8 @@ def train_model(
     lambda_seg=1.0, 
     lambda_cls=1.0, 
     output_dir="results",
-    resume_checkpoint=None
+    resume_checkpoint=None,
+    save_overlays=False  # Set to True if you want to save overlay images during validation
 ):
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     result_dir = os.path.join(output_dir, timestamp)
@@ -484,20 +485,22 @@ def train_model(
                 loss = lambda_seg * seg_loss + lambda_cls * cls_loss
                 val_metrics.update(loss, seg_loss, cls_loss, cls_logits, labels)
 
-                preds = cls_logits.argmax(dim=1)
-                for i in range(images.size(0)):
-                    pred_mask = seg_logits[i, 0]
-                    save_overlay_comparison(
-                        image_tensor=images[i],
-                        mask_tensor=masks[i],
-                        pred_mask_tensor=pred_mask,
-                        gt_label=labels[i].item(),
-                        pred_label=preds[i].item(),
-                        class_names=class_names,
-                        image_id=image_ids[i],
-                        epoch=epoch+1,
-                        output_folder=overlay_dir
-                    )
+                # Only save overlay images if enabled (this can slow down validation)
+                if save_overlays:
+                    preds = cls_logits.argmax(dim=1)
+                    for i in range(images.size(0)):
+                        pred_mask = seg_logits[i, 0]
+                        save_overlay_comparison(
+                            image_tensor=images[i],
+                            mask_tensor=masks[i],
+                            pred_mask_tensor=pred_mask,
+                            gt_label=labels[i].item(),
+                            pred_label=preds[i].item(),
+                            class_names=class_names,
+                            image_id=image_ids[i],
+                            epoch=epoch+1,
+                            output_folder=overlay_dir
+                        )
 
         current_lr = optimizer.param_groups[0]['lr']
         scheduler.step()
@@ -565,7 +568,7 @@ def train_model(
 # -------------------------------------------------------------------------
 # Evaluation Function
 # -------------------------------------------------------------------------
-def evaluate_model(model, test_loader, device='cuda', visualization_dir=None):
+def evaluate_model(model, test_loader, device='cuda', visualization_dir=None, save_overlays=False):
     model.eval()
     model.to(device)
 
@@ -584,7 +587,7 @@ def evaluate_model(model, test_loader, device='cuda', visualization_dir=None):
     class_total = [0] * 7
 
     test_overlay_dir = None
-    if visualization_dir is not None:
+    if visualization_dir is not None and save_overlays:
         test_overlay_dir = os.path.join(visualization_dir, "test_overlays")
         os.makedirs(test_overlay_dir, exist_ok=True)
 
@@ -620,6 +623,7 @@ def evaluate_model(model, test_loader, device='cuda', visualization_dir=None):
             all_predictions.extend(preds.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
 
+            # Save overlay images only if enabled
             if test_overlay_dir is not None:
                 for i in range(images.size(0)):
                     pred_mask = seg_logits[i, 0]
@@ -763,7 +767,7 @@ def main():
 
         # Set resume flag and path
         resume_training = True  # Set to False to train from scratch
-        resume_checkpoint = r"path/to/best_model.pth"  # Update with your checkpoint path (e.g., model from epoch 28)
+        resume_checkpoint = r"path/to/best_model.pth"  # Update with your checkpoint path
 
         # Change these paths to match your local setup:
         metadata_path = r"path to HAM10000_metadata.csv"
@@ -841,7 +845,8 @@ def main():
                 model=model,
                 num_epochs=100,
                 device=device,
-                resume_checkpoint=resume_checkpoint
+                resume_checkpoint=resume_checkpoint,
+                save_overlays=False  # Set to True to enable overlay saving (slower)
             )
         else:
             model, history, result_dir = train_model(
@@ -849,14 +854,17 @@ def main():
                 val_loader=val_loader,
                 model=model,
                 num_epochs=100,
-                device=device
+                device=device,
+                save_overlays=False
             )
 
         logger.info("Starting final model evaluation...")
         test_metrics = evaluate_model(
             model=model,
             test_loader=test_loader,
-            device=device
+            device=device,
+            visualization_dir=result_dir,
+            save_overlays=False  # Set to True to enable overlay saving during testing
         )
 
         seg_output_dir = os.path.join("segmented_images", datetime.now().strftime('%Y%m%d_%H%M%S'))
