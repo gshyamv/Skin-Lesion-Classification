@@ -1,3 +1,4 @@
+// screens/Details.js
 import React, { useState, useContext } from 'react';
 import { View, StyleSheet, SafeAreaView } from 'react-native';
 import { 
@@ -12,6 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { ThemeContext } from '../context/ThemeContext';
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DetailsScreen = () => {
   const theme = useTheme();
@@ -23,21 +25,45 @@ const DetailsScreen = () => {
   const [gender, setGender]       = useState('');
   const [dob, setDob]             = useState('');
   const [error, setError]         = useState('');
-
-  // Snackbar visibility
   const [snackbarVisible, setSnackbarVisible] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError('');
     if (!firstName.trim() || !lastName.trim()) {
       setError('First Name and Last Name are required.');
       return;
     }
 
-    // Show success via Snackbar
-    setSnackbarVisible(true);
-    // Optionally navigate right away or after the snackbar is dismissed
-    // navigation.navigate('Home');
+    // Retrieve the logged-in user's email from AsyncStorage
+    const userDataString = await AsyncStorage.getItem('userData');
+    const userData = userDataString ? JSON.parse(userDataString) : null;
+    if (!userData || !userData.email) {
+      setError('User not found. Please login again.');
+      return;
+    }
+
+    // Save the details to the backend
+    try {
+      const response = await fetch('http://192.168.222.143:5000/details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userData.email,
+          firstName,
+          lastName,
+          gender,
+          dob,
+        }),
+      });
+      const result = await response.json();
+      if (response.ok) {
+        setSnackbarVisible(true);
+      } else {
+        setError(result.error || 'Failed to update details');
+      }
+    } catch (err) {
+      setError('Failed to update details');
+    }
   };
 
   return (
@@ -107,7 +133,6 @@ const DetailsScreen = () => {
           Submit
         </Button>
 
-        {/* Snackbar to show success */}
         <Snackbar
           visible={snackbarVisible}
           onDismiss={() => {

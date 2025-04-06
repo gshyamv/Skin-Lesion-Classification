@@ -42,7 +42,7 @@ const RegisterScreen = ({ navigation }) => {
     setError('');
 
     try {
-      // Create user with email and password
+      // Create user with Firebase authentication
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         form.email,
@@ -51,7 +51,14 @@ const RegisterScreen = ({ navigation }) => {
 
       // Update user profile with display name
       await updateProfile(userCredential.user, {
-        displayName: form.name
+        displayName: form.name,
+      });
+
+      // Save user info to MongoDB via backend
+      await fetch('http://192.168.222.143:5000/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email, name: form.name }),
       });
 
       // Navigation will be handled by the auth state listener in App.js

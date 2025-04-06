@@ -1,6 +1,7 @@
+// firebase.js
 import { initializeApp, getApps } from "firebase/app";
 import { initializeAuth, getAuth, getReactNativePersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, doc, setDoc } from "firebase/firestore";
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
 // Firebase configuration
@@ -19,16 +20,24 @@ let auth;
 let db;
 
 if (getApps().length === 0) {
-    app = initializeApp(firebaseConfig);
-    auth = initializeAuth(app, {
-        storage: ReactNativeAsyncStorage
-    });
-    db = getFirestore(app);
+  app = initializeApp(firebaseConfig);
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+  });
+  db = getFirestore(app);
 } else {
-    app = getApps()[0];
-    auth = getAuth(app);
-    db = getFirestore(app);
+  app = getApps()[0];
+  auth = getAuth(app);
+  db = getFirestore(app);
 }
+
+// Helper function to add or update user details in a "userDetails" collection
+export const addUserDetails = async (userId, details) => {
+  // doc(db, "userDetails", userId) will create or overwrite the document
+  // with the userId as the doc ID in the "userDetails" collection.
+  const docRef = doc(db, "userDetails", userId);
+  await setDoc(docRef, details, { merge: true });
+};
 
 export { db };
 export default auth;
