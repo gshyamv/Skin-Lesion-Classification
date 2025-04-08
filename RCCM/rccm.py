@@ -59,15 +59,15 @@ class HAM10000Dataset(Dataset):
     Custom Dataset for HAM10000 data that loads:
       - An image (resized to IMAGE_SIZE)
       - A corresponding segmentation mask (resized to IMAGE_SIZE)
-      - A classification label from the dx_type column in metadata
+      - A classification label from the dx column in metadata
     """
     def __init__(self, df, image_dirs, mask_dir, label_dict=None, transform=None, sync_transform=None, image_size=(256,256)):
         """
         Args:
-            df: pandas DataFrame with columns 'image_id' and 'dx_type'.
+            df: pandas DataFrame with columns 'image_id' and 'dx'.
             image_dirs: List of directories containing image files (with .jpg extension).
             mask_dir: Directory containing the segmentation masks (with _mask_mask.png suffix).
-            label_dict: Mapping from dx_type (string) to integer label.
+            label_dict: Mapping from dx (string) to integer label.
             transform: Transformations to be applied to both image and mask (e.g. ToTensor).
             sync_transform: Synchronized transformations (e.g., flips and rotations) for both image and mask.
             image_size: Tuple (width, height) for resizing images and masks.
@@ -137,8 +137,8 @@ class HAM10000Dataset(Dataset):
         row_idx = self.valid_indices[idx]
         row = self.df.iloc[row_idx]
         image_id = row["image_id"]
-        dx_type_str = row["dx_type"]
-        label = self.label_dict[dx_type_str] if dx_type_str in self.label_dict else 0
+        dx_str = row["dx"]
+        label = self.label_dict[dx_str] if dx_str in self.label_dict else 0
 
         # Load image and mask
         image = self.load_image(image_id)
