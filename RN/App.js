@@ -1,6 +1,5 @@
-// src/app.js
+// App.js
 import React, { useState, useEffect } from 'react';
-import { ActivityIndicator, View, StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Provider as PaperProvider, MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
@@ -9,12 +8,11 @@ import RegisterScreen from './screens/rs1';
 import HomeScreen from './screens/HomeScreen';
 import MainScreen from './screens/MainScreen';
 import LoginScreen from './screens/LoginScreen';
-import DetailsScreen from './screens/Details';
-import ProfileScreen from './screens/ProfileScreen';
-import ResultScreen from './screens/ResultScreen'; 
 import { ThemeContext } from './context/ThemeContext';
 import auth from './services/firebase';
+import DetailsScreen from './screens/Details';
 import { onAuthStateChanged } from 'firebase/auth';
+import { ActivityIndicator, View } from 'react-native';
 
 const Stack = createStackNavigator();
 
@@ -80,6 +78,7 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setIsAuthenticated(!!user);
       setIsLoading(false);
+      
       // Store user data in AsyncStorage if logged in
       if (user) {
         try {
@@ -117,14 +116,15 @@ export default function App() {
         <NavigationContainer>
           <Stack.Navigator
             initialRouteName={isAuthenticated ? "Home" : "Main"}
-            screenOptions={{ headerShown: false, gestureEnabled: true }}
+            screenOptions={{
+              headerShown: false,
+              gestureEnabled: true,
+            }}
           >
             {isAuthenticated ? (
               <>
                 <Stack.Screen name="Home" component={HomeScreen} />
-                <Stack.Screen name="Profile" component={ProfileScreen} />
                 <Stack.Screen name="Details" component={DetailsScreen} />
-                <Stack.Screen name="Result" component={ResultScreen} />
               </>
             ) : (
               <>

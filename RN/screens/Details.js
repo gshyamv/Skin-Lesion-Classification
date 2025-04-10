@@ -1,6 +1,6 @@
 // screens/Details.js
-import React, { useState, useContext } from 'react';
-import { View, StyleSheet, SafeAreaView } from 'react-native';
+import React, { useState, useContext, useEffect } from 'react';
+import { View, StyleSheet, SafeAreaView, BackHandler } from 'react-native';
 import { 
   Text, 
   TextInput, 
@@ -8,9 +8,10 @@ import {
   useTheme, 
   IconButton, 
   Appbar, 
-  Snackbar
+  Snackbar,
+  ActivityIndicator
 } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ThemeContext } from '../context/ThemeContext';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,11 +22,65 @@ const DetailsScreen = () => {
   const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
 
   const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName]   = useState('');
-  const [gender, setGender]       = useState('');
-  const [dob, setDob]             = useState('');
-  const [error, setError]         = useState('');
+  const [lastName, setLastName] = useState('');
+  const [gender, setGender] = useState('');
+  const [dob, setDob] = useState('');
+  const [error, setError] = useState('');
   const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [userEmail, setUserEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Handle back button to prevent accidental navigation away
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (!isSubmitting) {
+          navigation.navigate('Home');
+          return true;
+        }
+        return false;
+      };
+
+      BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+    }, [isSubmitting, navigation])
+  );
+
+  // Get user data from AsyncStorage
+  useEffect(() => {
+    const getUserData = async () => {
+      try {
+        const userDataString = await AsyncStorage.getItem('userData');
+        if (userDataString) {
+          const userData = JSON.parse(userDataString);
+          setUserEmail(userData.email);
+          
+          // Check if user already has details
+          if (userData.email) {
+            const response = await fetch(`http://localhost:5000/getDetails?email=${userData.email}`);
+            const data = await response.json();
+            
+            if (data.details && data.details.details) {
+              const userDetails = data.details.details;
+              // Pre-fill the form if details exist
+              setFirstName(userDetails.firstName || '');
+              setLastName(userDetails.lastName || '');
+              setGender(userDetails.gender || '');
+              setDob(userDetails.dob || '');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setError('Failed to fetch user data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    getUserData();
+  }, []);
 
   const handleSubmit = async () => {
     setError('');
@@ -34,37 +89,59 @@ const DetailsScreen = () => {
       return;
     }
 
-    // Retrieve the logged-in user's email from AsyncStorage
-    const userDataString = await AsyncStorage.getItem('userData');
-    const userData = userDataString ? JSON.parse(userDataString) : null;
-    if (!userData || !userData.email) {
+    if (!userEmail) {
       setError('User not found. Please login again.');
       return;
     }
 
     // Save the details to the backend
     try {
+      setIsSubmitting(true);
+      
       const response = await fetch('http://localhost:5000/details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: userData.email,
+          email: userEmail,
           firstName,
           lastName,
           gender,
           dob,
         }),
       });
+      
       const result = await response.json();
       if (response.ok) {
         setSnackbarVisible(true);
+        // Wait for snackbar to be visible before navigating away
+        setTimeout(() => {
+          navigation.navigate('Home');
+        }, 2000);
       } else {
         setError(result.error || 'Failed to update details');
       }
     } catch (err) {
-      setError('Failed to update details');
+      console.error('Error submitting details:', err);
+      setError('Failed to update details. Please check your network connection.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+        <Appbar.Header style={styles.header} mode="center-aligned">
+          <Appbar.BackAction onPress={() => navigation.goBack()} />
+          <Appbar.Content title="Your Details" />
+        </Appbar.Header>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Loading your details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -129,17 +206,18 @@ const DetailsScreen = () => {
           mode="contained"
           onPress={handleSubmit}
           style={styles.submitButton}
+          disabled={isSubmitting}
+          loading={isSubmitting}
         >
-          Submit
+          {isSubmitting ? 'Submitting...' : 'Submit'}
         </Button>
 
         <Snackbar
           visible={snackbarVisible}
           onDismiss={() => {
             setSnackbarVisible(false);
-            navigation.navigate('Home');
           }}
-          duration={3000}
+          duration={2000}
         >
           Details submitted successfully!
         </Snackbar>
@@ -160,6 +238,15 @@ const styles = StyleSheet.create({
     padding: 20,
     justifyContent: 'center',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+  },
   title: {
     marginBottom: 30,
     textAlign: 'center',
@@ -174,9 +261,9 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
+    paddingVertical: 8,
+    borderRadius: 5,
+  }
 });
 
 export default DetailsScreen;

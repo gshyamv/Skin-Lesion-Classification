@@ -1,4 +1,3 @@
-// screens/mainscreen.js
 import React, { useContext } from 'react';
 import { View, StyleSheet, SafeAreaView, StatusBar, ScrollView } from 'react-native';
 import { Text, Button, Surface, useTheme, IconButton, Appbar } from 'react-native-paper';
@@ -96,7 +95,7 @@ const MainScreen = () => {
           <View style={styles.buttonContainer}>
             <Button
               mode="contained"
-              onPress={() => navigation.navigate('Register')}
+              onPress={() => navigation.navigate('Details')}
               style={styles.button}
               icon="account-plus"
             >

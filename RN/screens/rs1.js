@@ -37,34 +37,18 @@ const RegisterScreen = ({ navigation }) => {
 
   const handleRegister = async () => {
     if (!validateForm()) return;
-
     setLoading(true);
     setError('');
-
     try {
-      // Create user with Firebase authentication
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        form.email,
-        form.password
-      );
-
-      // Update user profile with display name
-      await updateProfile(userCredential.user, {
-        displayName: form.name,
-      });
-
-      // Save user info to MongoDB via backend
+      const userCredential = await createUserWithEmailAndPassword(auth, form.email, form.password);
+      await updateProfile(userCredential.user, { displayName: form.name });
       await fetch('http://localhost:5000/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: form.email, name: form.name }),
       });
-
-      // Navigation will be handled by the auth state listener in App.js
     } catch (error) {
       let errorMessage = 'Registration failed. Please try again.';
-      
       switch (error.code) {
         case 'auth/email-already-in-use':
           errorMessage = 'This email is already registered';
@@ -79,7 +63,6 @@ const RegisterScreen = ({ navigation }) => {
           errorMessage = 'Network error. Please check your connection';
           break;
       }
-      
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -93,21 +76,13 @@ const RegisterScreen = ({ navigation }) => {
         <Appbar.Content title="Register" />
         <IconButton
           icon={() => (
-            <Feather
-              name={isDarkTheme ? 'sun' : 'moon'}
-              size={24}
-              color={theme.colors.primary}
-            />
+            <Feather name={isDarkTheme ? 'sun' : 'moon'} size={24} color={theme.colors.primary} />
           )}
           onPress={toggleTheme}
         />
       </Appbar.Header>
-
       <View style={styles.container}>
-        <Text style={[styles.welcomeText, { color: theme.colors.primary }]}>
-          Create Your Account
-        </Text>
-        
+        <Text style={[styles.welcomeText, { color: theme.colors.primary }]}>Create Your Account</Text>
         <TextInput
           label="Full Name"
           value={form.name}
@@ -116,7 +91,6 @@ const RegisterScreen = ({ navigation }) => {
           style={styles.input}
           autoCapitalize="words"
         />
-        
         <TextInput
           label="Email"
           value={form.email}
@@ -126,7 +100,6 @@ const RegisterScreen = ({ navigation }) => {
           style={styles.input}
           autoCapitalize="none"
         />
-        
         <TextInput
           label="Password"
           value={form.password}
@@ -135,28 +108,11 @@ const RegisterScreen = ({ navigation }) => {
           mode="outlined"
           style={styles.input}
         />
-
-        {error ? (
-          <Text style={[styles.errorText, { color: theme.colors.error }]}>
-            {error}
-          </Text>
-        ) : null}
-        
-        <Button
-          mode="contained"
-          onPress={handleRegister}
-          style={styles.button}
-          loading={loading}
-          disabled={loading}
-        >
+        {error ? <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text> : null}
+        <Button mode="contained" onPress={handleRegister} style={styles.button} loading={loading} disabled={loading}>
           Register
         </Button>
-
-        <Button
-          mode="text"
-          onPress={() => navigation.navigate('Login')}
-          style={styles.linkButton}
-        >
+        <Button mode="text" onPress={() => navigation.navigate('Login')} style={styles.linkButton}>
           Already have an account? Login here
         </Button>
       </View>
@@ -165,37 +121,14 @@ const RegisterScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    elevation: 4,
-  },
-  container: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-  },
-  welcomeText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 30,
-    textAlign: 'center',
-  },
-  input: {
-    marginBottom: 15,
-  },
-  button: {
-    marginTop: 10,
-    paddingVertical: 6,
-  },
-  linkButton: {
-    marginTop: 20,
-  },
-  errorText: {
-    textAlign: 'center',
-    marginBottom: 10,
-  },
+  safeArea: { flex: 1 },
+  header: { elevation: 4 },
+  container: { flex: 1, padding: 20, justifyContent: 'center' },
+  welcomeText: { fontSize: 28, fontWeight: 'bold', marginBottom: 30, textAlign: 'center' },
+  input: { marginBottom: 15 },
+  button: { marginTop: 10, paddingVertical: 6 },
+  linkButton: { marginTop: 20 },
+  errorText: { textAlign: 'center', marginBottom: 10 },
 });
 
 export default RegisterScreen;

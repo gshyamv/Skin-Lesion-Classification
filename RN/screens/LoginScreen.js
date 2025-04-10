@@ -24,16 +24,12 @@ const LoginScreen = ({ navigation }) => {
       setError('Please fill in all fields');
       return;
     }
-
     setLoading(true);
     setError('');
-
     try {
       await signInWithEmailAndPassword(auth, form.email, form.password);
-      // Navigation will be handled by the auth state listener
     } catch (error) {
       let errorMessage = 'Login failed. Please try again.';
-      
       switch (error.code) {
         case 'auth/user-not-found':
         case 'auth/wrong-password':
@@ -46,7 +42,6 @@ const LoginScreen = ({ navigation }) => {
           errorMessage = 'Too many failed attempts. Please try again later';
           break;
       }
-      
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -60,21 +55,13 @@ const LoginScreen = ({ navigation }) => {
         <Appbar.Content title="Login" />
         <IconButton
           icon={() => (
-            <Feather
-              name={isDarkTheme ? 'sun' : 'moon'}
-              size={24}
-              color={theme.colors.primary}
-            />
+            <Feather name={isDarkTheme ? 'sun' : 'moon'} size={24} color={theme.colors.primary} />
           )}
           onPress={toggleTheme}
         />
       </Appbar.Header>
-
       <View style={styles.container}>
-        <Text style={[styles.welcomeText, { color: theme.colors.primary }]}>
-          Welcome Back
-        </Text>
-        
+        <Text style={[styles.welcomeText, { color: theme.colors.primary }]}>Welcome Back</Text>
         <TextInput
           label="Email"
           value={form.email}
@@ -84,7 +71,6 @@ const LoginScreen = ({ navigation }) => {
           style={styles.input}
           autoCapitalize="none"
         />
-        
         <TextInput
           label="Password"
           value={form.password}
@@ -93,29 +79,12 @@ const LoginScreen = ({ navigation }) => {
           mode="outlined"
           style={styles.input}
         />
-
-        {error ? (
-          <Text style={[styles.errorText, { color: theme.colors.error }]}>
-            {error}
-          </Text>
-        ) : null}
-        
-        <Button
-          mode="contained"
-          onPress={handleLogin}
-          style={styles.button}
-          loading={loading}
-          disabled={loading}
-        >
+        {error ? <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text> : null}
+        <Button mode="contained" onPress={handleLogin} style={styles.button} loading={loading} disabled={loading}>
           Login
         </Button>
-
-        <Button
-          mode="text"
-          onPress={() => navigation.navigate('Register')}
-          style={styles.linkButton}
-        >
-          Don't have an account? Register here
+        <Button mode="text" onPress={() => navigation.navigate('Register')} style={styles.linkButton}>
+          Don't have an account? Login here
         </Button>
       </View>
     </SafeAreaView>
@@ -123,37 +92,14 @@ const LoginScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    elevation: 4,
-  },
-  container: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-  },
-  welcomeText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 30,
-    textAlign: 'center',
-  },
-  input: {
-    marginBottom: 15,
-  },
-  button: {
-    marginTop: 10,
-    paddingVertical: 6,
-  },
-  linkButton: {
-    marginTop: 20,
-  },
-  errorText: {
-    textAlign: 'center',
-    marginBottom: 10,
-  },
+  safeArea: { flex: 1 },
+  header: { elevation: 4 },
+  container: { flex: 1, padding: 20, justifyContent: 'center' },
+  welcomeText: { fontSize: 28, fontWeight: 'bold', marginBottom: 30, textAlign: 'center' },
+  input: { marginBottom: 15 },
+  button: { marginTop: 10, paddingVertical: 6 },
+  linkButton: { marginTop: 20 },
+  errorText: { textAlign: 'center', marginBottom: 10 },
 });
 
 export default LoginScreen;
