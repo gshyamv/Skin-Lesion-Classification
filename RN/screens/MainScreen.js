@@ -95,7 +95,7 @@ const MainScreen = () => {
           <View style={styles.buttonContainer}>
             <Button
               mode="contained"
-              onPress={() => navigation.navigate('Details')}
+              onPress={() => navigation.navigate('Register')}
               style={styles.button}
               icon="account-plus"
             >

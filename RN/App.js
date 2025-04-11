@@ -8,6 +8,10 @@ import RegisterScreen from './screens/rs1';
 import HomeScreen from './screens/HomeScreen';
 import MainScreen from './screens/MainScreen';
 import LoginScreen from './screens/LoginScreen';
+import ResultScreen from './screens/ResultScreen'; 
+import DoctorListScreen from './screens/DoctorListScreens';
+import BookAppointmentScreen from './screens/BookAppointmentScreen';
+import AppointmentDetailsScreen from './screens/AppointmentDetailsScreen';  // Import the new screen
 import { ThemeContext } from './context/ThemeContext';
 import auth from './services/firebase';
 import DetailsScreen from './screens/Details';
@@ -16,7 +20,6 @@ import { ActivityIndicator, View } from 'react-native';
 
 const Stack = createStackNavigator();
 
-// Light theme configuration
 const lightTheme = {
   ...MD3LightTheme,
   colors: {
@@ -29,7 +32,6 @@ const lightTheme = {
   },
 };
 
-// Dark theme configuration
 const darkTheme = {
   ...MD3DarkTheme,
   colors: {
@@ -48,7 +50,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const theme = isDarkTheme ? darkTheme : lightTheme;
 
-  // Load theme preference from AsyncStorage
   useEffect(() => {
     const loadThemePreference = async () => {
       try {
@@ -73,13 +74,10 @@ export default function App() {
     }
   };
 
-  // Monitor authentication state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setIsAuthenticated(!!user);
       setIsLoading(false);
-      
-      // Store user data in AsyncStorage if logged in
       if (user) {
         try {
           await AsyncStorage.setItem('userData', JSON.stringify({
@@ -125,12 +123,22 @@ export default function App() {
               <>
                 <Stack.Screen name="Home" component={HomeScreen} />
                 <Stack.Screen name="Details" component={DetailsScreen} />
+                <Stack.Screen name="ResultScreen" component={ResultScreen} />
+                <Stack.Screen name="DoctorList" component={DoctorListScreen} />
+                <Stack.Screen name="BookAppointment" component={BookAppointmentScreen} />
+                {/* New screen added to authenticated stack */}
+                <Stack.Screen name="AppointmentDetails" component={AppointmentDetailsScreen} />
               </>
             ) : (
               <>
                 <Stack.Screen name="Main" component={MainScreen} />
                 <Stack.Screen name="Login" component={LoginScreen} />
                 <Stack.Screen name="Register" component={RegisterScreen} />
+                <Stack.Screen name="ResultScreen" component={ResultScreen} /> 
+                <Stack.Screen name="DoctorList" component={DoctorListScreen} />
+                <Stack.Screen name="BookAppointment" component={BookAppointmentScreen} />
+                {/* Optionally include AppointmentDetails here if needed */}
+                <Stack.Screen name="AppointmentDetails" component={AppointmentDetailsScreen} />
               </>
             )}
           </Stack.Navigator>

@@ -1,0 +1,32 @@
+DocID,FirstName,LastName,ClinicHospitalName,City,Specialty,YearsofExperience
+1,Surender Kumar,Dabas,BLK-Max Super Speciality Hospital,Delhi,Skin Cancer Surgery (Melanoma),`
+2,Sajjan,Rajpurohit,BLK-Max Super Speciality Hospital,Delhi,Medical Oncology (Skin Cancers),22
+3,Chandragouda,Dodagoudar,BLK-Max Super Speciality Hospital,Delhi,Head & Neck Cancer Surgery,18
+4,Deepak Kumar,Mittal,BLK-Max Super Speciality Hospital,Delhi,Radiation Oncology (Skin Lesions),20
+5,Pankaj Kumar,Pande,BLK-Max Super Speciality Hospital,Delhi,Surgical Oncology (Skin Malignancies),19
+6,Rahul,Kapoor,BLK-Max Super Speciality Hospital,Delhi,Reconstructive Surgery (Skin Cancer),15
+7,Reetesh,Ranjan,BLK-Max Super Speciality Hospital,Delhi,Head & Neck Oncology (Melanoma),17
+8,Vinay Kumar,Verma,BLK-Max Super Speciality Hospital,Delhi,Skin Cancer Reconstructive Surgery,16
+9,Sahil,Bambroo,BLK-Max Super Speciality Hospital,Delhi,Medical Oncology (Pre-Cancerous Lesions),12
+10,Amita,Jain,Private Clinic,Delhi,Skin Cancer Surgery (Melanoma/BCC),23
+11,Anil,Dcruz,Apollo Hospitals CBD Belapur,Mumbai,Head & Neck Surgical Oncology,37
+12,Nita,Nair,Apollo Hospitals,Mumbai,Skin Cancer Treatment,15+
+13,Ashwin Sunil,Tamhankar,Apollo Hospitals,Mumbai,Dermatologic Oncology,14
+14,Hitendra,Patil,Apollo Hospitals,Mumbai,Skin Cancer Surgery,18
+15,Mishil,Parikh,Apollo Hospitals,Mumbai,Mohs Surgery (BCC),20
+16,Kshama P,Vibhakar,Apollo Hospitals,Mumbai,Dermatology (Skin Cancer Screening),22
+17,Suraj,Shetty,Kokilaben Dhirubhai Ambani Hospital,Mumbai,Skin Cancer Diagnostics,16
+18,Vaidehi,Saigaonkar Newaskar,Lilavati Hospital,Mumbai,Melanoma Treatment,15
+19,Sonia,Tekchandani,Nanavati Max Hospital,Mumbai,Skin Cancer Surgery,39
+20,Kiran,Katkar,Fortis Hospital,Mumbai,Dermatologic Oncology,40
+...,...,...,...,...,...,...
+91,Narasimhalu,C.R.V.,VS Hospitals,Chennai,Dermatologic Surgery (Pre-Cancerous Lesions),30
+92,Prasenjit,Chatterjee,Apollo Clinic - Taratala,Kolkata,Radiation Oncology (Skin Cancer),29
+93,Sanjoy,Roy,Ruby Cancer Centre,Kolkata,Skin Cancer Radiotherapy,24
+94,Jayanta,Chakrabarti,Chittaranjan National Cancer Institute,Kolkata,Surgical Oncology (Melanoma),17
+95,Palas,De,Ruby General Hospital,Kolkata,Radiation Oncology (BCC),16
+96,Sayoni,Bhanja,Ruby General Hospital and Cancer Centre,Kolkata,Medical Oncology (Skin Malignancies),17
+97,Jaydip,Biswas,Atulya Diagnostics & Polyclinic,Kolkata,Surgical Oncology (Skin Cancer),44
+98,Soumen,Das,Private Clinic,Kolkata,Skin Cancer Specialist,10+
+99,Nikhilesh,Borkar,Sir H. N. Reliance Foundation Hospital,Mumbai,Surgical Oncology (Melanoma),21
+100,S. H.,Advani,Jaslok Hospital & Research Centre,Mumbai,Medical Oncology (Skin Cancers),55

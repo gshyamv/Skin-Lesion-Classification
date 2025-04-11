@@ -1,4 +1,3 @@
-// screens/RegisterScreen.js
 import React, { useState, useContext } from 'react';
 import { View, StyleSheet, SafeAreaView } from 'react-native';
 import { Text, TextInput, Button, useTheme, IconButton, Appbar } from 'react-native-paper';
@@ -13,12 +12,10 @@ const RegisterScreen = ({ navigation }) => {
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
   const handleInputChange = (field, value) => {
     setForm({ ...form, [field]: value });
     setError('');
   };
-
   const validateForm = () => {
     if (!form.name || !form.email || !form.password) {
       setError('Please fill in all fields');
@@ -34,7 +31,6 @@ const RegisterScreen = ({ navigation }) => {
     }
     return true;
   };
-
   const handleRegister = async () => {
     if (!validateForm()) return;
     setLoading(true);
@@ -68,47 +64,19 @@ const RegisterScreen = ({ navigation }) => {
       setLoading(false);
     }
   };
-
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <Appbar.Header style={styles.header} mode="center-aligned">
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title="Register" />
-        <IconButton
-          icon={() => (
-            <Feather name={isDarkTheme ? 'sun' : 'moon'} size={24} color={theme.colors.primary} />
-          )}
-          onPress={toggleTheme}
-        />
+        <IconButton icon={() => (<Feather name={isDarkTheme ? 'sun' : 'moon'} size={24} color={theme.colors.primary} />)} onPress={toggleTheme} />
       </Appbar.Header>
       <View style={styles.container}>
         <Text style={[styles.welcomeText, { color: theme.colors.primary }]}>Create Your Account</Text>
-        <TextInput
-          label="Full Name"
-          value={form.name}
-          onChangeText={(text) => handleInputChange('name', text)}
-          mode="outlined"
-          style={styles.input}
-          autoCapitalize="words"
-        />
-        <TextInput
-          label="Email"
-          value={form.email}
-          onChangeText={(text) => handleInputChange('email', text)}
-          keyboardType="email-address"
-          mode="outlined"
-          style={styles.input}
-          autoCapitalize="none"
-        />
-        <TextInput
-          label="Password"
-          value={form.password}
-          onChangeText={(text) => handleInputChange('password', text)}
-          secureTextEntry
-          mode="outlined"
-          style={styles.input}
-        />
-        {error ? <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text> : null}
+        <TextInput label="Full Name" value={form.name} onChangeText={(text) => handleInputChange('name', text)} mode="outlined" style={styles.input} autoCapitalize="words" />
+        <TextInput label="Email" value={form.email} onChangeText={(text) => handleInputChange('email', text)} keyboardType="email-address" mode="outlined" style={styles.input} autoCapitalize="none" />
+        <TextInput label="Password" value={form.password} onChangeText={(text) => handleInputChange('password', text)} secureTextEntry mode="outlined" style={styles.input} />
+        {error ? (<Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text>) : null}
         <Button mode="contained" onPress={handleRegister} style={styles.button} loading={loading} disabled={loading}>
           Register
         </Button>
@@ -119,7 +87,6 @@ const RegisterScreen = ({ navigation }) => {
     </SafeAreaView>
   );
 };
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   header: { elevation: 4 },
@@ -130,5 +97,4 @@ const styles = StyleSheet.create({
   linkButton: { marginTop: 20 },
   errorText: { textAlign: 'center', marginBottom: 10 },
 });
-
 export default RegisterScreen;
